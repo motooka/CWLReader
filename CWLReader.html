@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<!--
+MIT License
+
+Copyright (c) 2016 Tadahisa MOTOOKA
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+-->
+<head>
+	<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+	<meta charset="utf-8">
+	<title>CWLReader</title>
+
+<script src="https://sdk.amazonaws.com/js/aws-sdk-2.5.3.min.js"></script>
+<script type="text/javascript">
+var CWLReader = {};
+CWLReader.client = null;
+CWLReader.prepareClient = function() {
+	var accessKey = document.getElementById('access_key').value;
+	var secretAccessKey = document.getElementById('secret_access_key').value;
+	AWS.config.update({accessKeyId: accessKey, secretAccessKey: secretAccessKey});
+	AWS.config.region = document.getElementById('region').value;
+	CWLReader.client = new AWS.CloudWatchLogs({apiVersion: '2014-03-28'});
+};
+CWLReader.init = function() {
+	CWLReader.loadCredentials();
+	if(document.getElementById('access_key').value && document.getElementById('secret_access_key').value && document.getElementById('region').value) {
+		CWLReader.loadLogGroupsFirstTime();
+	}
+};
+CWLReader.saveCredentials = function() {
+	localStorage.setItem('CWLReader.access_key', document.getElementById('access_key').value);
+	localStorage.setItem('CWLReader.secret_access_key', document.getElementById('secret_access_key').value);
+	localStorage.setItem('CWLReader.region', document.getElementById('region').value);
+};
+CWLReader.loadCredentials = function() {
+	document.getElementById('access_key').value = localStorage.getItem('CWLReader.access_key');
+	document.getElementById('secret_access_key').value = localStorage.getItem('CWLReader.secret_access_key');
+	document.getElementById('region').value = localStorage.getItem('CWLReader.region');
+};
+
+CWLReader.loadLogGroupsFirstTime = function() {
+	CWLReader.prepareClient();
+	var tableObj = document.getElementById('logGroups');
+	var tbodyObj = tableObj.querySelector('tbody');
+	while(tbodyObj.firstChild) {
+		tbodyObj.removeChild(tbodyObj.firstChild);
+	}
+	CWLReader.loadLogGroups('');
+};
+CWLReader.loadLogGroups = function(nextToken) {
+	var tableObj = document.getElementById('logGroups');
+	var tbodyObj = tableObj.querySelector('tbody');
+	var params = {
+		//logGroupNamePrefix: '',
+		limit: 20
+	};
+	if(nextToken) {
+		params['nextToken'] = nextToken;
+	}
+	CWLReader.client.describeLogGroups(params, function(err, data) {
+		if (err) {
+			console.log(err, err.stack);
+			alert('Failed to load LogGroups. See console log.');
+		}
+		else {
+			//console.log(data);
+			var logGroups = data.logGroups;
+			for(var i=0; i<logGroups.length; i++) {
+				var tr = document.createElement('tr');
+				var tdLogGroupName = document.createElement('td');
+				var tdARN = document.createElement('td');
+				var tdLastRead = document.createElement('td');
+				var aLogGroupName = document.createElement('a');
+				
+				var arn = logGroups[i].arn;
+				var logGroupName = logGroups[i].logGroupName;
+				var lastRead = Number(localStorage.getItem('CWLReader.arn.'+arn));
+				if(lastRead) {
+					var lastReadObj = new Date(lastRead);
+					lastRead = lastReadObj.toISOString();
+				}
+				else {
+					lastRead = '-';
+				}
+				aLogGroupName.setAttribute('href', '#');
+				aLogGroupName.setAttribute('onclick', 'CWLReader.selectLogGroup(this.getAttribute("data-arn"), this.getAttribute("data-logGroupName")); return false;');
+				aLogGroupName.setAttribute('data-arn', arn);
+				aLogGroupName.setAttribute('data-logGroupName', logGroupName);
+				aLogGroupName.textContent = logGroupName;
+				tdLogGroupName.appendChild(aLogGroupName);
+				tdARN.textContent = arn;
+				tdARN.setAttribute('class', 'mono');
+				tdLastRead.textContent = lastRead;
+				
+				tr.appendChild(tdLogGroupName);
+				tr.appendChild(tdARN);
+				tr.appendChild(tdLastRead);
+				tbodyObj.appendChild(tr);
+			}
+			
+			if(data.nextToken) {
+				CWLReader.loadLogGroups(data.nextToken);
+			}
+			else if(!tbodyObj.firstChild) {
+				var tr = document.createElement('tr');
+				var td = document.createElement('td');
+				td.setAttribute('colspan', 3);
+				td.textContent = 'No LogGroups Found.';
+				tr.appendChild(td);
+				tbodyObj.appendChild(tr);
+			}
+		}
+	});
+};
+CWLReader.selectLogGroup = function(arn, logGroupName) {
+	document.getElementById('logGroupName').textContent = logGroupName;
+	document.getElementById('arn').textContent = arn;
+	
+	var startTimeObj = document.getElementById('startTime');
+	startTimeObj.value = '';
+	var lastRead = localStorage.getItem('CWLReader.arn.'+arn);
+	if(lastRead - 0) {
+		var lastReadObj = new Date(lastRead - 0);
+		startTimeObj.value = lastReadObj.toISOString();
+	}
+	
+	var nextTokenObj = document.getElementById('nextTokenForFilterLogEvents');
+	nextTokenObj.value = '';
+	CWLReader.loadEvents();
+	document.getElementById('logEventsInitial').style.display = 'none';
+	document.getElementById('logEventsContent').style.display = 'block';
+};
+CWLReader.loadEvents = function() {
+	var tableObj = document.getElementById('logEvents');
+	var tbodyObj = tableObj.querySelector('tbody');
+	while(tbodyObj.firstChild) {
+		tbodyObj.removeChild(tbodyObj.firstChild);
+	}
+	
+	var logGroupName = document.getElementById('logGroupName').textContent;
+	var arn = document.getElementById('arn').textContent;
+	var startTimeObj = document.getElementById('startTime');
+	var startTimeStr = startTimeObj.value;
+	var startTimeDate = null;
+	var startTime = null;
+	if(startTimeStr) {
+		startTimeDate = new Date(startTimeStr);
+		if(!isNaN(startTimeDate.valueOf())) {
+			startTime = startTimeDate.valueOf();
+		}
+	}
+	var nextTokenObj = document.getElementById('nextTokenForFilterLogEvents');
+	var nextToken = nextTokenObj.value;
+	
+	CWLReader.prepareClient();
+	
+	var params = {
+		logGroupName: logGroupName,
+		interleaved: true,
+		limit: 20
+	};
+	if(startTime) {
+		params['startTime'] = startTime;
+	}
+	if(nextToken) {
+		params['nextToken'] = nextToken;
+	}
+	CWLReader.client.filterLogEvents(params, function(err, data) {
+		if (err) {
+			console.log(err, err.stack);
+			alert('Error. See console log.');
+		}
+		else {
+			//console.log(data);
+			var nextTokenReceived = null;
+			if(data.nextToken) {
+				nextTokenReceived = data.nextToken;
+			}
+			var starttimeReceived = startTime;
+			var events = data.events;
+			var eventCount = events.length;
+			for(var i=0; i<eventCount; i++) {
+				var event = events[i];
+				var ingestionTime = event.ingestionTime;
+				var logStreamName = event.logStreamName;
+				var message = event.message;
+				var timestamp = event.timestamp;
+				
+				var tr = document.createElement('tr');
+				var tdTimestamp = document.createElement('td');
+				var tdStream = document.createElement('td');
+				var tdMessage = document.createElement('td');
+				
+				//tdTimestamp.textContent = timestamp + "\n" + new Date(timestamp);
+				tdTimestamp.textContent = (new Date(timestamp)).toISOString();
+				tdStream.textContent = logStreamName;
+				tdMessage.textContent = message;
+				tdMessage.setAttribute('class', 'mono');
+				tr.appendChild(tdTimestamp);
+				tr.appendChild(tdStream);
+				tr.appendChild(tdMessage);
+				tbodyObj.appendChild(tr);
+				
+				starttimeReceived = timestamp;
+			}
+			
+			if(eventCount == 0) {
+				var tr = document.createElement('tr');
+				var td = document.createElement('td');
+				
+				td.setAttribute('colspan', 3);
+				td.textContent = 'No log entries found.';
+				
+				tr.appendChild(td);
+				tbodyObj.appendChild(tr);
+			}
+			else {
+				nextTokenObj.value = nextTokenReceived;
+				startTimeObj.value = (new Date(starttimeReceived)).toISOString();
+				localStorage.setItem('CWLReader.arn.'+arn, starttimeReceived);
+			}
+			
+		}
+	});
+};
+
+
+if(window.addEventListener) {
+	window.addEventListener('load', CWLReader.init, false);
+}
+else if(window.attachEvent) {
+	window.attachEvent('onload', CWLReader.init);
+}
+else {
+	window.onload = CWLReader.init;
+}
+</script>
+<style type="text/css">
+code {
+	background-color: #e8e8e8;
+	padding: 2px 4px;
+	border-radius: 4px;
+}
+table {
+	border: 1px solid black;
+	border-collapse: collapse;
+}
+table th,
+table td {
+	border: 1px solid black;
+	padding: 2px 4px;
+}
+td.mono {
+	font-family: monospace;
+	word-break: break-all;
+}
+#logEventsInitial {
+}
+#logEventsContent {
+	display: none;
+}
+#footer {
+	margin: 24px auto 8px auto;
+	font-size: 80%;
+	text-align: center;
+}
+</style>
+</head>
+<body>
+<h1>CWLReader</h1>
+<p>
+A simple reader of <a href="http://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html" target="_blank">Amazon CloudWatch Logs</a> LogGroups. This reader reminds the last log entry you have read and suggests where you should start to read.
+</p>
+<fieldset>
+	<legend>Credentials &amp; Region</legend>
+	<div>
+		<p>These credentials are stored on your browser : <a href="http://www.w3schools.com/html/html5_webstorage.asp" target="_blank">HTML5 LocalStorage</a></p>
+		<dl>
+			<dt>Access Key ID : This IAM user must have permissions of <code>logs:DescribeLogGroups</code> &amp; <code>logs:FilterLogEvents</code>. It is recommended that the user should not have other permissions.</dt>
+			<dd>
+				<input type="text" id="access_key" value="" style="width:80%;"/>
+			</dd>
+			<dt>Secret Access Key</dt>
+			<dd>
+				<input type="password" id="secret_access_key" value="" style="width:80%;"/>
+			</dd>
+			<dt>Region</dt>
+			<dd>
+				<select id="region">
+					<option>us-east-1</option>
+					<option>us-west-1</option>
+					<option>us-west-2</option>
+					<option>ap-south-1</option>
+					<option>ap-northeast-2</option>
+					<option>ap-southeast-1</option>
+					<option>ap-southeast-2</option>
+					<option>ap-northeast-1</option>
+					<option>eu-central-1</option>
+					<option>eu-west-1</option>
+					<option>sa-east-1</option>
+				</select>
+				<span style="font-size:80%;">Can't find your favourite region? Visit <a href="http://docs.aws.amazon.com/general/latest/gr/rande.html#cwl_region" target="_blank">here</a> and update the source and send a pull request.</span>
+			</dd>
+		</dl>
+		<button onclick="CWLReader.saveCredentials();">save</button>
+		<button onclick="CWLReader.loadCredentials();">load</button>
+	</div>
+</fieldset>
+
+<fieldset>
+	<legend>Log Groups</legend>
+	<div>
+		<button id="logGroupLoader" onclick="CWLReader.loadLogGroupsFirstTime();">Reload Log Groups</button>
+		<table id="logGroups">
+			<thead>
+				<tr>
+					<th>Log Group Name</th>
+					<th>arn</th>
+					<th>is read until (UTC)</th>
+				</tr>
+			</thead>
+			<tbody>
+				<tr>
+					<td colspan="3">
+						Fill credentials and select a region above, and then press &quot;Reload Log Groups&quot; button.
+					</td>
+				</tr>
+			</tbody>
+		</table>
+	</div>
+</fieldset>
+
+<fieldset>
+	<legend>Log Events</legend>
+	<div id="logEventsInitial">
+		Select a LogGroup above.
+	</div>
+	<div id="logEventsContent">
+		<ul id="logEventsConditions">
+			<li>Log Group Name : <span id="logGroupName"></span></li>
+			<li>ARN : <span id="arn" class="mono"></span></li>
+			<li>start time (UTC) : <input type="text" id="startTime" size="30" onchange="document.getElementById('nextTokenForFilterLogEvents').value='';"/></li>
+			<li style="display:none;">next token : <input type="text" id="nextTokenForFilterLogEvents" style=""/></li>
+			<li><button onclick="CWLReader.loadEvents();">Query Next Chunk</button>
+		</ul>
+		<table id="logEvents">
+			<thead>
+				<tr>
+					<th>Log Timestamp</th>
+					<th>Stream Name</th>
+					<th>Message</th>
+				</tr>
+			</thead>
+			<tbody>
+			</tbody>
+		</table>
+	</div>
+</fieldset>
+
+<div id="footer">
+Copyright &copy; 2016 <a href="https://github.com/motooka" target="_blank">Tadahisa MOTOOKA</a>.
+</div>
+</body>
+</html>

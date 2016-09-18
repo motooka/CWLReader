@@ -238,6 +238,18 @@ CWLReader.loadEvents = function() {
 				localStorage.setItem('CWLReader.arn.'+arn, starttimeReceived);
 			}
 			
+			// focus the button
+			var theButton = document.getElementById('queryNextChunkButton');
+			theButton.focus();
+			
+			// scroll to the LogEvents Fieldset
+			var theFieldset = document.getElementById('logEventsFieldset');
+			var fsTop = 0;
+			var offsetP = theFieldset;
+			do {
+				fsTop += offsetP.offsetTop;
+			} while(offsetP = offsetP.offsetParent);
+			window.scroll(0, fsTop);
 		}
 	});
 };
@@ -348,7 +360,7 @@ A simple reader of <a href="http://docs.aws.amazon.com/AmazonCloudWatch/latest/l
 	</div>
 </fieldset>
 
-<fieldset>
+<fieldset id="logEventsFieldset">
 	<legend>Log Events</legend>
 	<div id="logEventsInitial">
 		Select a LogGroup above.
@@ -359,7 +371,7 @@ A simple reader of <a href="http://docs.aws.amazon.com/AmazonCloudWatch/latest/l
 			<li>ARN : <span id="arn" class="mono"></span></li>
 			<li>start time (UTC) : <input type="text" id="startTime" size="30" onchange="document.getElementById('nextTokenForFilterLogEvents').value='';"/></li>
 			<li style="display:none;">next token : <input type="text" id="nextTokenForFilterLogEvents" style=""/></li>
-			<li><button onclick="CWLReader.loadEvents();">Query Next Chunk</button>
+			<li><button id="queryNextChunkButton" onclick="CWLReader.loadEvents();">Query Next Chunk</button></li>
 		</ul>
 		<table id="logEvents">
 			<thead>

@@ -202,6 +202,7 @@ CWLReader.loadEvents = function() {
 				var ingestionTime = event.ingestionTime;
 				var logStreamName = event.logStreamName;
 				var message = event.message;
+				var messageLines = message.split(/\r?\n/);
 				var timestamp = event.timestamp;
 				
 				var tr = document.createElement('tr');
@@ -210,10 +211,15 @@ CWLReader.loadEvents = function() {
 				var tdMessage = document.createElement('td');
 				
 				//tdTimestamp.textContent = timestamp + "\n" + new Date(timestamp);
-				tdTimestamp.textContent = (new Date(timestamp)).toISOString();
+				tdTimestamp.textContent = (new Date(timestamp)).toISOString().replace(/T/, ' ');
 				tdStream.textContent = logStreamName;
-				tdMessage.textContent = message;
-				tdMessage.setAttribute('class', 'mono');
+				
+				messageLines.forEach(function(element, index, arr) {
+					var p = document.createElement('p');
+					p.setAttribute('class', 'mono');
+					p.textContent = element;
+					tdMessage.appendChild(p);
+				});
 				tr.appendChild(tdTimestamp);
 				tr.appendChild(tdStream);
 				tr.appendChild(tdMessage);
@@ -283,6 +289,14 @@ table td {
 td.mono {
 	font-family: monospace;
 	word-break: break-all;
+}
+table td p.mono {
+	font-family: monospace;
+	word-break: break-all;
+	margin: 0px 0px 4px 0px;
+}
+table td p.mono:last-child {
+	margin-bottom: 0px;
 }
 #logEventsInitial {
 }

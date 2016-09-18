@@ -202,6 +202,7 @@ CWLReader.loadEvents = function() {
 				var ingestionTime = event.ingestionTime;
 				var logStreamName = event.logStreamName;
 				var message = event.message;
+				var messageLines = message.split(/\r?\n/);
 				var timestamp = event.timestamp;
 				
 				var tr = document.createElement('tr');
@@ -210,10 +211,15 @@ CWLReader.loadEvents = function() {
 				var tdMessage = document.createElement('td');
 				
 				//tdTimestamp.textContent = timestamp + "\n" + new Date(timestamp);
-				tdTimestamp.textContent = (new Date(timestamp)).toISOString();
+				tdTimestamp.textContent = (new Date(timestamp)).toISOString().replace(/T/, ' ');
 				tdStream.textContent = logStreamName;
-				tdMessage.textContent = message;
-				tdMessage.setAttribute('class', 'mono');
+				
+				messageLines.forEach(function(element, index, arr) {
+					var p = document.createElement('p');
+					p.setAttribute('class', 'mono');
+					p.textContent = element;
+					tdMessage.appendChild(p);
+				});
 				tr.appendChild(tdTimestamp);
 				tr.appendChild(tdStream);
 				tr.appendChild(tdMessage);
@@ -238,6 +244,18 @@ CWLReader.loadEvents = function() {
 				localStorage.setItem('CWLReader.arn.'+arn, starttimeReceived);
 			}
 			
+			// focus the button
+			var theButton = document.getElementById('queryNextChunkButton');
+			theButton.focus();
+			
+			// scroll to the LogEvents Fieldset
+			var theFieldset = document.getElementById('logEventsFieldset');
+			var fsTop = 0;
+			var offsetP = theFieldset;
+			do {
+				fsTop += offsetP.offsetTop;
+			} while(offsetP = offsetP.offsetParent);
+			window.scroll(0, fsTop);
 		}
 	});
 };
@@ -271,6 +289,14 @@ table td {
 td.mono {
 	font-family: monospace;
 	word-break: break-all;
+}
+table td p.mono {
+	font-family: monospace;
+	word-break: break-all;
+	margin: 0px 0px 4px 0px;
+}
+table td p.mono:last-child {
+	margin-bottom: 0px;
 }
 #logEventsInitial {
 }
@@ -348,7 +374,7 @@ A simple reader of <a href="http://docs.aws.amazon.com/AmazonCloudWatch/latest/l
 	</div>
 </fieldset>
 
-<fieldset>
+<fieldset id="logEventsFieldset">
 	<legend>Log Events</legend>
 	<div id="logEventsInitial">
 		Select a LogGroup above.
@@ -359,7 +385,7 @@ A simple reader of <a href="http://docs.aws.amazon.com/AmazonCloudWatch/latest/l
 			<li>ARN : <span id="arn" class="mono"></span></li>
 			<li>start time (UTC) : <input type="text" id="startTime" size="30" onchange="document.getElementById('nextTokenForFilterLogEvents').value='';"/></li>
 			<li style="display:none;">next token : <input type="text" id="nextTokenForFilterLogEvents" style=""/></li>
-			<li><button onclick="CWLReader.loadEvents();">Query Next Chunk</button>
+			<li><button id="queryNextChunkButton" onclick="CWLReader.loadEvents();">Query Next Chunk</button></li>
 		</ul>
 		<table id="logEvents">
 			<thead>

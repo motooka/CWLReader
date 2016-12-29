@@ -29,7 +29,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 -->
 
-<script src="https://sdk.amazonaws.com/js/aws-sdk-2.5.3.min.js"></script>
+<script src="https://sdk.amazonaws.com/js/aws-sdk-2.7.19.min.js"></script>
 <script type="text/javascript">
 var CWLReader = {};
 CWLReader.client = null;
@@ -273,11 +273,40 @@ else {
 }
 </script>
 <style type="text/css">
+html {
+	font-family: sans-serif;
+}
+header {
+	margin: 0 0 0 4px;
+}
+header > h1 {
+	margin: 0;
+}
+header > h1 > span {
+	font-size: 60%;
+	font-weight: normal;
+}
+
+fieldset {
+	margin: 16px 0 0 0;
+}
+fieldset > legend {
+	font-size: 120%;
+	font-weight: bold;
+}
+fieldset > div > ul {
+	margin: 0 0 8px 0;
+}
+
+p {
+	margin: 0;
+}
 code {
 	background-color: #e8e8e8;
 	padding: 2px 4px;
 	border-radius: 4px;
 }
+
 table {
 	border: 1px solid black;
 	border-collapse: collapse;
@@ -287,6 +316,7 @@ table td {
 	border: 1px solid black;
 	padding: 2px 4px;
 }
+.mono,
 td.mono {
 	font-family: monospace;
 	word-break: break-all;
@@ -299,10 +329,18 @@ table td p.mono {
 table td p.mono:last-child {
 	margin-bottom: 0px;
 }
+
+#settingsFieldSet input {
+	width: 20em;
+	max-width: 60%;
+}
 #logEventsInitial {
 }
 #logEventsContent {
 	display: none;
+}
+#logEvents tr td:nth-child(2) {
+	word-break: break-all;
 }
 #footer {
 	margin: 24px auto 8px auto;
@@ -312,48 +350,53 @@ table td p.mono:last-child {
 </style>
 </head>
 <body>
-<h1>CWLReader</h1>
-<p>
-A simple reader of <a href="http://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html" target="_blank">Amazon CloudWatch Logs</a> LogGroups. This reader reminds the last log entry you have read and suggests where you should start to read.
-</p>
-<fieldset>
-	<legend>Credentials &amp; Region</legend>
+<header>
+	<h1>CWLReader <span>version 1.2</span></h1>
+	<p>
+	A simple reader of <a href="http://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html" target="_blank">Amazon CloudWatch Logs</a> LogGroups. This reader reminds the last log entry you have read and suggests where you should start to read.
+	</p>
+</header>
+<fieldset id="settingsFieldSet">
+	<legend>1. Settings : Credentials &amp; Region</legend>
 	<div>
-		<p>These credentials are stored on your browser : <a href="http://www.w3schools.com/html/html5_webstorage.asp" target="_blank">HTML5 LocalStorage</a></p>
-		<dl>
-			<dt>Access Key ID : This IAM user must have permissions of <code>logs:DescribeLogGroups</code> &amp; <code>logs:FilterLogEvents</code>. It is recommended that the user should not have other permissions.</dt>
-			<dd>
-				<input type="text" id="access_key" value="" style="width:80%;"/>
-			</dd>
-			<dt>Secret Access Key</dt>
-			<dd>
-				<input type="password" id="secret_access_key" value="" style="width:80%;"/>
-			</dd>
-			<dt>Region</dt>
-			<dd>
+		<ul>
+			<li>
+				Access Key ID
+				<input type="text" id="access_key" value=""/>
+				<br/>
+				<span style="font-size:80%;">This IAM user must have permissions of <code>logs:DescribeLogGroups</code> &amp; <code>logs:FilterLogEvents</code>. It is recommended that the user should not have other permissions.</span>
+			</li>
+			<li>
+				Secret Access Key
+				<input type="password" id="secret_access_key" value=""/>
+			</li>
+			<li>
+				Region
 				<select id="region">
-					<option>us-east-1</option>
-					<option>us-west-1</option>
-					<option>us-west-2</option>
-					<option>ap-south-1</option>
-					<option>ap-northeast-2</option>
-					<option>ap-southeast-1</option>
-					<option>ap-southeast-2</option>
-					<option>ap-northeast-1</option>
-					<option>eu-central-1</option>
-					<option>eu-west-1</option>
-					<option>sa-east-1</option>
+					<option value="us-east-1">us-east-1 N. Virginia</option>
+					<option value="us-east-2">us-east-2 N. Ohio</option>
+					<option value="us-west-1">us-west-1 N. California</option>
+					<option value="us-west-2">us-west-2 Oregon</option>
+					<option value="ca-central-1">ca-central-1 Canada Central</option>
+					<option value="ap-south-1">ap-south-1 Mumbai</option>
+					<option value="ap-northeast-2">ap-northeast-2 Seoul</option>
+					<option value="ap-southeast-1">ap-southeast-1 Singapore</option>
+					<option value="ap-southeast-2">ap-southeast-2 Sydney</option>
+					<option value="ap-northeast-1">ap-northeast-1 Tokyo</option>
+					<option value="eu-central-1">eu-central-1 Frankfurt</option>
+					<option value="eu-west-1">eu-west-1 Ireland</option>
+					<option value="eu-west-2">eu-west-2 London</option>
+					<option value="sa-east-1">sa-east-1 São Paulo</option>
 				</select>
 				<span style="font-size:80%;">Can't find your favourite region? Visit <a href="http://docs.aws.amazon.com/general/latest/gr/rande.html#cwl_region" target="_blank">here</a> and update the source and send a pull request.</span>
-			</dd>
-		</dl>
-		<button onclick="CWLReader.saveCredentials();">save</button>
-		<button onclick="CWLReader.loadCredentials();">load</button>
+			</li>
+		</ul>
+		<button onclick="CWLReader.saveCredentials();">save</button> <span style="font-size:80%;">These credentials are saved on your browser (<a href="http://www.w3schools.com/html/html5_webstorage.asp" target="_blank">HTML5 LocalStorage</a>) and will be restored when you reload this page.</span>
 	</div>
 </fieldset>
 
 <fieldset>
-	<legend>Log Groups</legend>
+	<legend>2. Select a Log Group</legend>
 	<div>
 		<button id="logGroupLoader" onclick="CWLReader.loadLogGroupsFirstTime();">Reload Log Groups</button>
 		<table id="logGroups">
@@ -376,17 +419,19 @@ A simple reader of <a href="http://docs.aws.amazon.com/AmazonCloudWatch/latest/l
 </fieldset>
 
 <fieldset id="logEventsFieldset">
-	<legend>Log Events</legend>
+	<legend>3. Log Events</legend>
 	<div id="logEventsInitial">
-		Select a LogGroup above.
+		Select a Log Group above.
 	</div>
 	<div id="logEventsContent">
 		<ul id="logEventsConditions">
-			<li>Log Group Name : <span id="logGroupName"></span></li>
-			<li>ARN : <span id="arn" class="mono"></span></li>
-			<li>start time (UTC) : <input type="text" id="startTime" size="30" onchange="document.getElementById('nextTokenForFilterLogEvents').value='';"/></li>
+			<li>Log Group Name : <span id="logGroupName" class="mono"></span></li>
+			<li>Log Group ARN : <span id="arn" class="mono"></span></li>
 			<li style="display:none;">next token : <input type="text" id="nextTokenForFilterLogEvents" style=""/></li>
-			<li><button id="queryNextChunkButton" onclick="CWLReader.loadEvents();">Query Next Chunk</button></li>
+			<li>start time (UTC) :
+				<input type="text" id="startTime" size="30" onchange="document.getElementById('nextTokenForFilterLogEvents').value='';"/>
+				<button id="queryNextChunkButton" onclick="CWLReader.loadEvents();">Query Next Chunk</button>
+			</li>
 		</ul>
 		<table id="logEvents">
 			<thead>
@@ -403,7 +448,9 @@ A simple reader of <a href="http://docs.aws.amazon.com/AmazonCloudWatch/latest/l
 </fieldset>
 
 <div id="footer">
-Copyright &copy; 2016 <a href="https://github.com/motooka" target="_blank">Tadahisa MOTOOKA</a>.
+	<a href="https://github.com/motooka/CWLReader" target="_blank">CWLReader</a>
+	|
+	Copyright &copy; 2016 <a href="https://github.com/motooka" target="_blank">Tadahisa MOTOOKA</a>.
 </div>
 </body>
 </html>
